@@ -15,7 +15,9 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/input.h>
+#include <linux/timer.h>
 #include <linux/jiffies.h>
+#include <linux/version.h>
 
 MODULE_AUTHOR("Thomas Kremer");
 MODULE_DESCRIPTION("Pseudo PC-Speaker driver");
@@ -26,11 +28,19 @@ MODULE_LICENSE("LGPL");
 static struct input_dev *dev;
 
 
-static void sftwrspkr_on_sync_timer(unsigned long ignored) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
+#define DEF_TIMER(a,b) DEFINE_TIMER(a,b,0,0)
+#define TIMER_ARGS unsigned long ignored
+#else
+#define DEF_TIMER(a,b) DEFINE_TIMER(a,b)
+#define TIMER_ARGS struct timer_list* ignored
+#endif
+
+static void sftwrspkr_on_sync_timer(TIMER_ARGS) {
   input_sync(dev);
 }
 
-static DEFINE_TIMER(sftwrspkr_sync_timer, sftwrspkr_on_sync_timer, 0, 0);
+static DEF_TIMER(sftwrspkr_sync_timer, sftwrspkr_on_sync_timer);
 
 #define default_delay msecs_to_jiffies(1)
 

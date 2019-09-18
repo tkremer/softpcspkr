@@ -1,2 +1,2 @@
-module/sftwrspkr/* usr/src/sftwrspkr-0.1/
+module/sftwrspkr/* usr/src/sftwrspkr-0.2/
 udev/*.rules lib/udev/rules.d/

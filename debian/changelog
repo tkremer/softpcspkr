@@ -1,3 +1,9 @@
+softpcspkr (0.2) unstable; urgency=low
+
+  * Adapted to new timer calling conventions of kernel 4.14.
+
+ -- Thomas Kremer <softpcspkr@xorg.c-informatik.de>  Wed, 18 Sep 2019 18:02:33 +0200
+
 softpcspkr (0.1) unstable; urgency=low
 
   * Initial Release.
