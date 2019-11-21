@@ -8,7 +8,9 @@ use warnings;
 
 use Math::Trig "pi";
 
-$| = 1;
+my $aplay_buffer;
+my $sizeof_input_event = length(pack("l! l! S S l"));
+                                # sec, usec, type, code, value
 
 sub slurp {
   my $fname = shift;
@@ -17,6 +19,13 @@ sub slurp {
   my $content = <$f>//"";
   close($f);
   return $content;
+}
+
+sub load_wav {
+  my $fname = shift;
+  my $wav = slurp($fname);
+  return if $wav eq "";
+  return $wav; # just return it with the header.
 }
 
 sub load_wav_s16le {
@@ -44,14 +53,25 @@ sub load_wav_s16le {
 sub load_wavs {
   my $dir = shift;
   my @res;
-  for (glob($dir."/*.wav")) {
-    my $pcm = load_wav_s16le($_);
+  # FIXED: glob does not work well with spaces in filenames!
+  #for (glob($dir."/*.wav")) {
+  opendir(my $d,$dir) or die "cannot opendir: $!";
+  for (readdir($d)) {
+    next unless /\.wav$/;
+    my $f = $dir."/".$_;
+    next unless -f "$f";
+    my $pcm = load_wav($dir."/".$_);
     push @res, $pcm if defined $pcm;
   }
   return \@res;
 }
 
+# DONE: should use /dev/input/by-path/virtual-sftwrspkr-event
 sub open_evdev {
+  my $f;
+  if (open($f,"<","/dev/input/by-path/virtual-sftwrspkr-event")) {
+    return $f;
+  }
   my @inputs = glob("/sys/class/input/event*");
   my $dev = undef;
   for (@inputs) {
@@ -61,14 +81,12 @@ sub open_evdev {
       die "device exists, but has no device node in /dev/input!" unless -e $dev;
       die "device node is not a char device!" unless -c $dev;
       die "we have no read permission to the device node!" unless -r $dev;
-      open(my $f,"<",$dev) or die "cannot open $dev: $!!";
+      open($f,"<",$dev) or die "cannot open $dev: $!!";
       return $f;
     }
   }
   die "could not find sftwrspkr event device";
 }
-
-my $sizeof_input_event = length(pack("l! l! S S l"));
 
 sub get_event {
   my $dev = shift;
@@ -89,17 +107,17 @@ sub is_tone_on_event {
       && $value != 0;
 }
 
-my ($aplay_handle,$aplay_buffer);
-if (@ARGV) {
-  my $dir = shift;
-  $aplay_buffer = load_wavs($dir);
-}
+# ignored parameter: $ev
 sub play_tone {
-  if (!defined $aplay_handle) {
-    open($aplay_handle,"|-",qw(aplay -q -f S16_LE -c 1 -t raw -r 44100)) or die "cannot exec aplay";
-  }
+  my $event = shift;
+  my ($freq) = unpack("x[l! l! S S] l",$event);
+  my $aplay_handle;
+  my @cmd = defined $aplay_buffer ? qw(aplay -q -t wav) 
+                     : qw(aplay -q -f S16_LE -c 1 -t raw -r 44100);
+  open($aplay_handle,"|-",@cmd) or die "cannot exec aplay";
   if (!defined $aplay_buffer) {
-    my $f = 660;
+    #my $f = 660;
+    my $f = $freq;
     my $samps_per_period = 44100/$f;
     my $len = 44100/5;
     my $volume = 32767*0.1;
@@ -114,14 +132,35 @@ sub play_tone {
   $aplay_handle = undef;
 }
 
+sub async_play_tone {
+  my $ev = shift;
+  my $res = fork;
+  if (!$res) {
+    play_tone($ev);
+    if (defined $res) {
+      exit 0;
+    }
+  }
+}
+
+
+$SIG{CHLD} = "IGNORE";
+
+if (@ARGV) {
+  my $dir = shift;
+  $aplay_buffer = load_wavs($dir);
+  if (@$aplay_buffer == 0) {
+    die "no wav files could be loaded!";
+  }
+}
 
 my $evdev = open_evdev();
 
 while (my $ev = get_event($evdev)) {
   if (is_tone_on_event($ev)) {
     #print "play.";
-    play_tone($ev);
+    #play_tone($ev);
+    async_play_tone($ev);
   }
 }
-
 
