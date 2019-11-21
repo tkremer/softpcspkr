@@ -1,3 +1,12 @@
+softpcspkr (0.3) unstable; urgency=low
+
+  *  Added support for any type of wav file.
+  *  Dropped idea of puzzling with raw samples.
+  *  Changed to non-serialized audio output.
+  *  Support for different frequencies when synthesizing.
+
+ -- Thomas Kremer <softpcspkr@xorg.c-informatik.de>  Thu Nov 21 19:29:17 2019 +0100
+
 softpcspkr (0.2) unstable; urgency=low
 
   * Adapted to new timer calling conventions of kernel 4.14.
